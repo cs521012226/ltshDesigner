@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+         
+    <!-- Start 【 项目自定义的Realm 】 -->
+    <bean id="myRealm" class="org.ltsh.framework.security.realm.MyRealm" >
+    	 <property name="credentialsMatcher">
+	        <bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+	            <property name="hashAlgorithmName" value="SHA-256" />
+	            <property name="hashIterations" value="1024" />
+	            <property name="storedCredentialsHexEncoded" value="false" />
+	        </bean>
+    	</property>
+    </bean>
+    <!-- End -->
+    
+    <!-- Start 【 缓存, 采用EhCache 】 -->
+    <bean id="ehCacheManager" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+        <property name="cacheManagerConfigFile" value="classpath:ehcache/ehcache-shiro.xml"/>
+    </bean>
+    
+    <!-- Start 【 sessionManager 】 -->
+    <bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+    	<!-- 【 session 超时时间,默认就是30分钟 】 -->
+    	<property name="globalSessionTimeout" value="1800000"/>
+    	<!-- 【 定期验证session避免会话孤儿,并从会话数据存储中删除 】 -->
+    	<property name="sessionValidationScheduler">
+    		<bean class="org.apache.shiro.session.mgt.ExecutorServiceSessionValidationScheduler"/>
+    	</property>
+    	<!-- 【 sessionDao实现 】 -->
+    	<property name="sessionDAO">	
+    		<bean class="org.apache.shiro.session.mgt.eis.EnterpriseCacheSessionDAO"/>
+    	</property>
+    	<!-- 【 session监听list 】 -->
+    	<property name="sessionListeners">	
+    		<list>
+    			<bean id="sessionStartListener" class="org.ltsh.framework.security.listener.SessionStartListener"/> 
+    		</list>
+    	</property>
+    </bean>
+    
+    
+    <!-- Start 【 SecurityManager 】 -->
+    <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="realm" ref="myRealm"/>
+        <property name="cacheManager" ref="ehCacheManager"/>
+        <property name="sessionManager" ref="sessionManager"/>
+    </bean>
+    <!-- End -->
+    
+	<!-- Start 【 Shiro Filter 】 -->
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="loginUrl" value="/login/loginPage"/>
+        <property name="successUrl" value="/login/mainPage"/>
+        <property name="unauthorizedUrl" value="/login/loginPage" />
+        
+        <property name="securityManager" ref="securityManager"/>
+        <property name="filters">
+            <map>
+                <entry key="authc">
+					<bean class="org.ltsh.framework.security.filter.LoginFormAuthenticationFilter"/>
+				</entry>
+            </map>
+        </property>
+        <property name="filterChainDefinitions">
+            <value>
+            	/login/loginPage = authc
+            	/logout = logout
+            	/public/** = anon
+            	/** = user
+            </value>
+        </property>
+    </bean> 
+    <!-- End -->
+    
+    <!-- Start 【 开启 Shiro 安全检查注解功能，如 @RequiresRoles @RequiresPermissions等 】-->
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+    
+    <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" depends-on="lifecycleBeanPostProcessor"/>
+    
+	<bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+    	<property name="securityManager" ref="securityManager"/>
+	</bean>
+	<!-- End -->
+	 
+</beans>

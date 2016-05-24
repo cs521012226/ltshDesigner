@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx-3.0.xsd
+		http://www.springframework.org/schema/aop
+     	http://www.springframework.org/schema/aop/spring-aop-3.0.xsd">
+         
+    <!-- Start 【 基于注解的IOC 】 -->
+	<context:component-scan base-package="org.ltsh.app.modules.*">
+		  <context:exclude-filter type="regex" expression=".*Controller" />  
+	</context:component-scan>
+	<context:component-scan base-package="org.ltsh.framework.modules.*">
+		  <context:exclude-filter type="regex" expression=".*Controller" />  
+	</context:component-scan>
+	<!-- End -->     
+	
+	 <!-- Start 【配置文件的Bean 】 -->
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:/properties/jdbc.properties</value>
+            </list>
+        </property>
+    </bean>
+    <!-- End -->     
+    <!-- log 独立spring 调用log4j的配置 web不需要-->
+<!-- 	<bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean" > -->
+<!--         <property name="targetClass" value="org.springframework.util.Log4jConfigurer" /> -->
+<!--         <property name="targetMethod" value="initLogging" /> -->
+<!--         <property name="arguments"> -->
+<!--             <list> -->
+<!--                 <value>WebRoot/WEB-INF/classes/properties/log4j.properties</value> -->
+<!--             </list> -->
+<!--         </property> -->
+<!--     </bean> -->
+	
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" destroy-method="close">
+	    <property name="driverClass" value="${jdbc.driverClass}"/>
+	    <property name="jdbcUrl" value="${jdbc.jdbcUrl}"/>
+	    <property name="user" value="${jdbc.user}"/>
+	    <property name="password" value="${jdbc.password}"/>
+	    
+		<property name="minPoolSize" value="1" />
+		<property name="maxPoolSize" value="20" />
+		<property name="initialPoolSize" value="5"/>
+	</bean>
+	 <bean id="sessionFactory" class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+    	<property name="dataSource" ref="dataSource"/>
+    	<!-- xml实体映射使用
+    	<property name="mappingLocations">
+            <value>classpath*:/org/ltsh/**/*.hbm.xml</value> 
+        </property>
+        -->
+          <property name="packagesToScan">
+			<list>
+			     <value>org.ltsh.app.modules.demo.entity</value>
+			     <value>org.ltsh.framework.modules.admin.entity</value>
+			     <value>org.ltsh.framework.modules.base.entity</value>
+			</list>
+		</property>
+	    <property name="hibernateProperties">
+	      <value>
+				 <!--hibernate.dialect=org.hibernate.dialect.Oracle10gDialect -->
+				hibernate.dialect = org.hibernate.dialect.MySQL5InnoDBDialect
+				hibernate.hbm2ddl.auto = update
+				hibernate.show_sql=true
+	      </value>
+	    </property>
+  	</bean>
+  	<!-- Start 【 事务管理器 】 -->
+  	<bean id="hibernateTransactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
+  		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+	<!-- End -->
+	
+	<!-- Start 【 Spring 事务配置 】 -->
+	<bean class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator">
+        <property name="beanNames">
+            <list>
+                <value>*Service</value>
+                <value>*ServiceImpl</value>
+            </list>
+        </property>
+        <property name="interceptorNames">
+            <list>
+                <value>transactionInterceptor</value>
+            </list>
+        </property>
+    </bean>
+    <bean id="transactionInterceptor" class="org.springframework.transaction.interceptor.TransactionInterceptor">
+        <property name="transactionManager" ref="hibernateTransactionManager" />
+        <property name="transactionAttributes">
+            <props>
+                <!-- 这里的方法签名可以精确到方法, 先懒惰一下全配置上 -->
+                <prop key="*">PROPAGATION_REQUIRED, -Exception</prop>
+                <prop key="get*">PROPAGATION_REQUIRED, readOnly</prop>
+                <prop key="find*">PROPAGATION_REQUIRED, readOnly</prop>
+            </props>
+        </property>
+    </bean>
+	<!-- End -->
+	
+	<!-- Start 【 Spring aop配置 】
+	<aop:config>
+  		<aop:aspect id="myAspect" ref="demoAspect">
+  			<aop:pointcut id="anySelectMethod" expression="execution(* org.charles.demo.service.*.select*(..))"/>
+  			<aop:before pointcut-ref="anySelectMethod" method="doBefore"/>
+  			<aop:after-returning pointcut-ref="anySelectMethod" method="doAfterReturning" returning="retVal"/>
+  			<aop:after-throwing pointcut-ref="anySelectMethod" method="doAfterThrowing" throwing="dataAccessEx" />
+  			<aop:after pointcut-ref="anySelectMethod" method="doAfter"/>
+  			<aop:around pointcut-ref="anySelectMethod" method="doAround"/>
+  		</aop:aspect>
+	</aop:config>
+
+	<bean id="demoAspect" class="org.charles.demo.aspect.DemoAspect"/>
+	 -->
+	 
+</beans>
